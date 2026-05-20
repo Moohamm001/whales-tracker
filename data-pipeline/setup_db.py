@@ -94,9 +94,28 @@ CREATE TABLE IF NOT EXISTS StockPrices (
     UNIQUE (stock_id, quarter)
 );
 
+-- Per-(fund, stock) insights computed from full filing history. Cached at
+-- write-time by data-pipeline/compute_insights.py so the web app doesn't
+-- have to re-derive avg_cost / trend / first_buy per page load (which was
+-- multi-second for funds with thousands of holdings).
+CREATE TABLE IF NOT EXISTS HoldingInsights (
+    fund_id                  INTEGER NOT NULL,
+    stock_id                 INTEGER NOT NULL,
+    first_buy_quarter        TEXT,
+    last_activity_quarter    TEXT,
+    last_activity_type       TEXT,
+    est_avg_cost             REAL,
+    trend                    TEXT,
+    position_predates_window INTEGER NOT NULL DEFAULT 0,
+    computed_at              TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (fund_id, stock_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_holdings_filing ON Holdings(filing_id);
+CREATE INDEX IF NOT EXISTS idx_holdings_stock  ON Holdings(stock_id);
 CREATE INDEX IF NOT EXISTS idx_filings_fund    ON Filings(fund_id);
 CREATE INDEX IF NOT EXISTS idx_changes_fund    ON HoldingChanges(fund_id, quarter);
+CREATE INDEX IF NOT EXISTS idx_changes_stock   ON HoldingChanges(fund_id, stock_id, quarter);
 CREATE INDEX IF NOT EXISTS idx_prices_stock    ON StockPrices(stock_id, quarter);
 """
 

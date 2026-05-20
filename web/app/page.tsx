@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Card from "@/components/Card";
 import StatCard from "@/components/StatCard";
-import { listFunds } from "@/lib/db";
+import { listFunds, listMostHeldStocks } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +39,7 @@ export default function HomePage() {
   const totalAum = funds.reduce((s, f) => s + (f.total_value || 0), 0);
   const totalPositions = funds.reduce((s, f) => s + (f.holdings_count || 0), 0);
   const fundsWithData = funds.filter((f) => f.total_value > 0).length;
+  const popular = listMostHeldStocks(15);
 
   return (
     <>
@@ -141,6 +142,45 @@ export default function HomePage() {
           </div>
         )}
       </Card>
+
+      {/* Most-held stocks */}
+      {popular.length > 0 && (
+        <Card
+          title="Most-held stocks"
+          subtitle="Stocks held by the highest number of tracked investors"
+          pad={false}
+          className="mt-5"
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm zebra">
+              <thead>
+                <tr className="text-muted text-xs uppercase tracking-wide bg-bg border-b border-line">
+                  <th className="text-left  px-4 py-2.5 font-medium">Ticker</th>
+                  <th className="text-left  px-4 py-2.5 font-medium">Company</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Holders</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Combined value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {popular.map((s) => (
+                  <tr key={s.cusip} className="border-b border-line/60 last:border-0">
+                    <td className="px-4 py-2 font-semibold text-navy">
+                      <Link href={`/stocks/${s.ticker}`} className="hover:text-sky">
+                        {s.ticker}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2 text-slate">{s.name}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{s.holders}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-medium">
+                      {fmtMoney(s.total_value)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Methodology note */}
       <p className="mt-6 text-xs text-muted leading-relaxed max-w-3xl">

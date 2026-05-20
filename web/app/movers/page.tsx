@@ -72,7 +72,13 @@ export default function MoversPage() {
                     <td className="px-3 py-2">
                       <ChangeBadge type={m.change_type} />
                     </td>
-                    <td className="px-3 py-2 font-semibold text-navy">{m.ticker ?? "—"}</td>
+                    <td className="px-3 py-2 font-semibold text-navy">
+                      {m.ticker ? (
+                        <Link href={`/stocks/${m.ticker}`} className="hover:text-sky">
+                          {m.ticker}
+                        </Link>
+                      ) : "—"}
+                    </td>
                     <td className="px-3 py-2 text-slate">{m.name}</td>
                     <td className="px-3 py-2">
                       <Link

@@ -69,15 +69,13 @@ def fetch_submissions(cik: str) -> dict:
     return json.loads(_http_get(url).decode("utf-8"))
 
 
-def latest_13f_filings(submissions: dict, limit: int = 40) -> list[dict]:
-    """Return up to `limit` most recent 13F-HR filings (newest first)."""
-    recent = submissions.get("filings", {}).get("recent", {})
-    forms = recent.get("form", [])
-    accessions = recent.get("accessionNumber", [])
-    primary_docs = recent.get("primaryDocument", [])
-    filing_dates = recent.get("filingDate", [])
-    report_dates = recent.get("reportDate", [])
-
+def _extract_13fs(block: dict) -> list[dict]:
+    """Pull all 13F-HR entries out of a submissions block (recent or archive)."""
+    forms = block.get("form", [])
+    accessions = block.get("accessionNumber", [])
+    primary_docs = block.get("primaryDocument", [])
+    filing_dates = block.get("filingDate", [])
+    report_dates = block.get("reportDate", [])
     out = []
     for i, form in enumerate(forms):
         if form == "13F-HR":
@@ -87,9 +85,46 @@ def latest_13f_filings(submissions: dict, limit: int = 40) -> list[dict]:
                 "filed_date": filing_dates[i],
                 "period_of_report": report_dates[i],
             })
-            if len(out) >= limit:
-                break
     return out
+
+
+def all_13f_filings(submissions: dict, *, include_archives: bool = True) -> list[dict]:
+    """All 13F-HR filings for a fund, newest first.
+
+    SEC's submissions JSON has a `recent` block (~last 1000 filings) plus a
+    `files` array pointing to archive JSON files for older history. Following
+    `files` lets us reach a fund's earliest 13F (often the late 1990s).
+    """
+    recent = submissions.get("filings", {}).get("recent", {})
+    out = _extract_13fs(recent)
+
+    if include_archives:
+        files = submissions.get("filings", {}).get("files", [])
+        for f in files:
+            name = f.get("name")
+            if not name:
+                continue
+            try:
+                arc = json.loads(_http_get(
+                    f"https://data.sec.gov/submissions/{name}"
+                ).decode("utf-8"))
+            except Exception as e:
+                print(f"  [WARN] archive fetch failed for {name}: {e}")
+                continue
+            out.extend(_extract_13fs(arc))
+
+    # Sort newest-first by period_of_report
+    out.sort(key=lambda r: r["period_of_report"], reverse=True)
+    return out
+
+
+def latest_13f_filings(submissions: dict, limit: int = 200) -> list[dict]:
+    """Backwards-compat wrapper: most recent N 13F-HRs across recent + archives.
+
+    Default raised to 200 (50 years) so we get every filing a fund has on
+    record. Limit is capped after merging recent + archive results.
+    """
+    return all_13f_filings(submissions, include_archives=True)[:limit]
 
 
 def find_info_table_xml(cik: str, accession: str) -> str | None:
@@ -478,7 +513,7 @@ def process_fund(conn, fund_row: tuple):
         print(f"  [ERR] Network error: {e}")
         return
 
-    filings = latest_13f_filings(subs, limit=40)  # 10 years
+    filings = latest_13f_filings(subs, limit=200)  # all available
     if not filings:
         print(f"  [WARN] No 13F-HR filings found")
         return

@@ -145,7 +145,11 @@ export default function FundPage({ params }: { params: { cik: string } }) {
       {/* Holdings */}
       <Card
         title="Holdings"
-        subtitle={`${holdings.length} positions in latest filing (${fund.latest_quarter ?? "—"})`}
+        subtitle={
+          holdings.length < (fund.holdings_count ?? 0)
+            ? `Top ${holdings.length} of ${fund.holdings_count} positions (${fund.latest_quarter ?? "—"}) — sorted by value`
+            : `${holdings.length} positions in latest filing (${fund.latest_quarter ?? "—"})`
+        }
         right={
           <span className="text-[11px]">
             sorted by value
@@ -186,7 +190,13 @@ export default function FundPage({ params }: { params: { cik: string } }) {
                 {holdings.map((h, i) => (
                   <tr key={h.cusip} className="border-b border-line/60 last:border-0">
                     <td className="px-3 py-2 text-right text-muted tabular-nums">{i + 1}</td>
-                    <td className="px-3 py-2 font-semibold text-navy">{h.ticker ?? "—"}</td>
+                    <td className="px-3 py-2 font-semibold text-navy">
+                      {h.ticker ? (
+                        <Link href={`/stocks/${h.ticker}`} className="hover:text-sky">
+                          {h.ticker}
+                        </Link>
+                      ) : "—"}
+                    </td>
                     <td className="px-3 py-2 text-slate">{h.name}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtShares(h.shares)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium text-slate">
@@ -292,7 +302,13 @@ export default function FundPage({ params }: { params: { cik: string } }) {
                     <td className="px-3 py-2">
                       <ChangeBadge type={c.change_type} />
                     </td>
-                    <td className="px-3 py-2 font-semibold text-navy">{c.ticker ?? "—"}</td>
+                    <td className="px-3 py-2 font-semibold text-navy">
+                      {c.ticker ? (
+                        <Link href={`/stocks/${c.ticker}`} className="hover:text-sky">
+                          {c.ticker}
+                        </Link>
+                      ) : "—"}
+                    </td>
                     <td className="px-3 py-2 text-slate">{c.name}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtShares(c.shares_before)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtShares(c.shares_after)}</td>

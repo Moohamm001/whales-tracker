@@ -1,0 +1,27 @@
+I want you to upgrade the existing "Whales Tracker" MVP by adding three advanced data dimensions: Real-time Insider Trading (Form 4), Live AUM & S&P 500 Benchmarking, and Sector Allocation. 
+
+### Context
+- **Tech Stack:** Python 3 (Pipeline), SQLite (`hedge_data.db`), Next.js 14 (App Router), TypeScript, Tailwind CSS, `better-sqlite3`.
+- **Aesthetic:** Old-school DOS / BBS aesthetic (CGA palette, box-drawing borders, CRT scanlines). Ensure all new UI components strictly adhere to this theme.
+- **Current State:** The basic 13F crawler and database exist. I need to expand the schema, build new Python jobs, and expose new API routes.
+
+### Requirements
+1. **Database Schema Update:** Update `setup_db.py` to:
+   - Add `sector` and `industry` columns to the existing `Stocks` table.
+   - Create a new `InsiderTrades` table (columns: id, ticker, insider_name, transaction_type, shares, price, transaction_date).
+2. **Sector Allocation & Stock Metadata:** Modify the data pipeline to fetch and populate stock sector data. Create a Next.js API route (`GET /api/funds/:cik/sectors`) that uses a SQL GROUP BY query to return the total portfolio value segmented by sector.
+3. **Live AUM & Benchmarking (yfinance):** Write a new Python script (`calc_live_aum.py`) that uses the `yfinance` library to fetch the latest End-of-Day (EOD) closing prices for all tickers in the database, including the S&P 500 (SPY). Create an API route (`GET /api/funds/:cik/performance`) that calculates the current live value of the fund's 13F holdings using these latest prices.
+4. **Insider Trading Feed:** Write a Python script (`insider_crawler.py`) that fetches recent Form 4 insider trading data (you can use a mock structure or standard free API approach for now if RSS is too complex). Create an API route (`GET /api/insiders/recent`) and build a scrolling "Ticker Tape" or dedicated feed component on the frontend to display these trades.
+
+### Execution Workflow
+Please act as an autonomous senior developer and follow these steps:
+1. **Analyze:** Read `data-pipeline/setup_db.py`, `data-pipeline/sec_crawler.py`, and the Next.js `app` directory to understand the current architecture and DOS/BBS styling.
+2. **Plan:** Output a brief, 4-step plan detailing the SQL alterations and file changes.
+3. **Execute (Python):** Update the SQLite schema, write `calc_live_aum.py`, and write `insider_crawler.py`. Ensure `yfinance` is added to `requirements.txt`.
+4. **Execute (Next.js):** Build the 3 new API routes and update the dashboard UI (`page.tsx`) to display Sector Allocation (e.g., using ASCII bar charts), the Benchmarking stats, and the Insider feed. 
+5. **Verify:** Run the Python setup scripts to ensure the database updates correctly without crashing. Then run `npm run build` to verify the TypeScript types and Next.js build. Fix any errors automatically.
+
+### Constraints
+- Do NOT break the existing 13F crawler logic. 
+- Keep the UI strictly within the DOS/BBS terminal theme (no modern rounded corners, no soft shadows, stick to monospaced fonts).
+- Rely on `yfinance` for free pricing data to avoid API key limits.
