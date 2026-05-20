@@ -1,0 +1,42 @@
+# Database — large, regeneratable from sec_crawler.py + fetch_stock_prices.py
+hedge_data.db
+hedge_data.db-journal
+hedge_data.db-shm
+hedge_data.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.python-version
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel/
+web/dev.log
+web/*.tsbuildinfo
+
+# Pipeline logs / scratch
+data-pipeline/crawl.log
+data-pipeline/*.log
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,29 @@
+I want you to build the foundational MVP for a HedgeFollow clone—a web application that tracks hedge fund portfolios by pulling and displaying SEC 13F-HR filings.
+
+### Context
+- **Tech Stack:**
+  - Data Pipeline & Backend: Python 3
+  - Database: SQLite (for rapid prototyping)
+  - Frontend: Next.js (App Router), TypeScript, Tailwind CSS
+- **Current State:** This is a brand new project. There are no existing files.
+- **Desired Behavior:** I need a working data pipeline that fetches 13F data from the SEC EDGAR API for a specific fund, saves it to a database, and a basic frontend to display those holdings in a table.
+
+### Requirements
+1. **Database Setup:** Create a Python script (`setup_db.py`) to initialize a SQLite database (`hedge_data.db`) with three tables: `Funds`, `Holdings` (must include CUSIP, shares, and value), and `Stocks`.
+2. **Data Pipeline (Crawler):** Write a Python script (`sec_crawler.py`) that fetches the latest 13F-HR XML filing for Berkshire Hathaway (CIK: 0001067983) from the SEC EDGAR API. Parse the XML and insert the holdings into the SQLite database.
+3. **Frontend Display:** Initialize a Next.js project in a `web` directory. Create a simple API route to read from the SQLite database, and build a main dashboard page (`page.tsx`) that displays the fetched holdings in a clear, sortable data table.
+4. CUSIP Mapping: Integrate a mechanism to map CUSIP codes from the 13F filing to standard stock tickers. The Python crawler should map these before inserting them into the database so the frontend displays recognizable tickers.
+5. Data Aggregation: The 13F XML often contains multiple entries for the same stock. The Python script must group by CUSIP/Ticker and sum the shares and value before saving to the SQLite database.
+
+### Execution Workflow
+Please act as an autonomous senior developer and follow these steps:
+1. **Analyze:** Review the requirements and structure the project directories (e.g., `/data-pipeline` and `/web`).
+2. **Plan:** Output a brief, 3-step plan of how you will execute this.
+3. **Execute (Python):** Write the SQLite setup and the SEC EDGAR fetching script. Ensure you include a fake `User-Agent` header in the requests, as required by the SEC.
+4. **Execute (Next.js):** Bootstrap the Next.js app and build the UI components.
+5. **Verify:** Run the Python script to populate the DB, then attempt to build the Next.js app using `npm run build`. Fix any errors automatically.
+
+### Constraints
+- The SEC limits API requests to 10 requests per second. Ensure the Python crawler includes basic rate limiting or `time.sleep()`.
+- Use standard Python libraries (`requests`, `sqlite3`, `xml.etree.ElementTree`) for the backend to minimize dependencies.
+- Keep the UI clean and minimalist, using standard Tailwind utility classes.
