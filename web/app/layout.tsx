@@ -32,6 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Funds
               </Link>
               <Link
+                href="/discover"
+                className="px-3 py-2 text-white/85 hover:text-white hover:bg-navyDk rounded transition-colors hover:no-underline"
+              >
+                Discover
+              </Link>
+              <Link
                 href="/movers"
                 className="px-3 py-2 text-white/85 hover:text-white hover:bg-navyDk rounded transition-colors hover:no-underline"
               >

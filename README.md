@@ -433,9 +433,42 @@ If you want to run this locally or contribute, here's the technical setup.
 The pipeline is idempotent — you can re-run it any time. Each step skips work
 it's already done.
 
-    python data-pipeline/sec_crawler.py        # picks up new filings
-    python data-pipeline/fetch_stock_prices.py # adds prices for new tickers
-    python data-pipeline/compute_insights.py   # ALWAYS re-run after new filings
+    python data-pipeline/sec_crawler.py            # picks up new filings
+    python data-pipeline/fetch_stock_prices.py     # adds prices for new tickers
+    python data-pipeline/compute_insights.py       # legacy per-(fund, stock) cache
+    python data-pipeline/compute_position_lifecycle.py    # NEW — pattern/phase/conviction per position
+    python data-pipeline/compute_accumulation.py          # NEW — per-stock accumulation phase + activity feed
+
+### Insight layer (new)
+
+On top of the raw 13F data, an **insight layer** answers the question
+"who is starting to accumulate this stock, when, how much, and how
+aggressively?":
+
+- `PositionLifecycle` — one row per (fund, stock) with the full story:
+  first-buy quarter, add/reduce counts, consecutive adds, pattern
+  (`probe` / `pyramid` / `linear-accumulate` / `re-entry` / `single-shot`
+  / `distribute` / `stable`), phase (`building` / `holding` / `trimming`
+  / `exited`), and a 0-100 conviction score combining size×consistency×skill.
+- `StockAccumulationProfile` — per-stock aggregate: holders count over
+  the last 3 quarters, new entrants, exited holders, top by dollars and
+  by conviction, and a phase label: `undiscovered` / `early-accumulation`
+  / `consensus-build` / `crowded` / `topping` / `distribution`.
+- `StockActivityEvent` — narrative event log per (stock, fund, quarter)
+  for the timeline UI.
+
+Build it after the base pipeline:
+
+    python data-pipeline/migrate_insight_schema.py     # one-time schema migration
+    python data-pipeline/seed_smart_funds.py           # tag the 12 with style metadata
+    python data-pipeline/compute_position_lifecycle.py # ~30s
+    python data-pipeline/compute_accumulation.py       # ~60s
+    python data-pipeline/sample_insights.py            # smoke test — prints top stocks per phase
+
+Optional: enrich with market-cap / sector for cap-bucket filtering
+(slow, yfinance-rate-limited):
+
+    python data-pipeline/fetch_market_caps.py --limit=500
 
 ### API endpoints
 

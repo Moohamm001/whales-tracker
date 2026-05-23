@@ -462,3 +462,276 @@ export function getFundSeries(cik: string): FundSeries {
     )
     .all(cik) as FundSeries;
 }
+
+// ===========================================================================
+// INSIGHT LAYER — PositionLifecycle / StockAccumulationProfile / activity feed
+// ===========================================================================
+
+export type Phase =
+  | "undiscovered"
+  | "early-accumulation"
+  | "consensus-build"
+  | "crowded"
+  | "topping"
+  | "distribution"
+  | "holding";
+
+export type Pattern =
+  | "probe"
+  | "pyramid"
+  | "linear-accumulate"
+  | "re-entry"
+  | "single-shot"
+  | "distribute"
+  | "stable";
+
+export type PositionPhase = "building" | "holding" | "trimming" | "exited";
+
+// ---------- Discovery: find stocks by accumulation phase ----------
+
+export type DiscoveryStock = {
+  ticker: string | null;
+  name: string;
+  cusip: string;
+  sector: string | null;
+  market_cap_usd: number | null;
+  market_cap_bucket: string | null;
+  current_holders_count: number;
+  holders_count_delta_3q: number;
+  total_smart_money_value: number;
+  total_smart_money_value_delta: number;
+  phase: Phase;
+  top_holder_by_dollars: string | null;
+  top_holder_by_conviction: string | null;
+  top_holder_by_conviction_pct: number | null;
+  new_entrants_last_quarter: string;
+  first_smart_buyer: string | null;
+  first_smart_buy_quarter: string | null;
+};
+
+export type DiscoveryFilters = {
+  phase?: Phase | "any";
+  cap_bucket?: "micro" | "small" | "mid" | "large" | "mega" | "any";
+  sector?: string | "any";
+  min_holders?: number;
+  max_holders?: number;
+  min_holders_growth_3q?: number;
+  limit?: number;
+};
+
+export function getDiscoveryStocks(f: DiscoveryFilters = {}): DiscoveryStock[] {
+  const where: string[] = ["s.ticker IS NOT NULL"];
+  const params: any[] = [];
+
+  if (f.phase && f.phase !== "any") {
+    where.push("ap.phase = ?");
+    params.push(f.phase);
+  }
+  if (f.cap_bucket && f.cap_bucket !== "any") {
+    where.push("s.market_cap_bucket = ?");
+    params.push(f.cap_bucket);
+  }
+  if (f.sector && f.sector !== "any") {
+    where.push("s.sector = ?");
+    params.push(f.sector);
+  }
+  if (f.min_holders != null) {
+    where.push("ap.current_holders_count >= ?");
+    params.push(f.min_holders);
+  }
+  if (f.max_holders != null) {
+    where.push("ap.current_holders_count <= ?");
+    params.push(f.max_holders);
+  }
+  if (f.min_holders_growth_3q != null) {
+    where.push("ap.holders_count_delta_3q >= ?");
+    params.push(f.min_holders_growth_3q);
+  }
+
+  const limit = f.limit ?? 100;
+
+  const rows = db()
+    .prepare(
+      `SELECT s.ticker, s.name, s.cusip, s.sector, s.market_cap_usd, s.market_cap_bucket,
+              ap.current_holders_count, ap.holders_count_delta_3q,
+              ap.total_smart_money_value, ap.total_smart_money_value_delta,
+              ap.phase, ap.top_holder_by_dollars,
+              ap.top_holder_by_conviction, ap.top_holder_by_conviction_pct,
+              ap.new_entrants_last_quarter,
+              ap.first_smart_buyer, ap.first_smart_buy_quarter
+       FROM StockAccumulationProfile ap
+       JOIN Stocks s ON s.id = ap.stock_id
+       WHERE ${where.join(" AND ")}
+       ORDER BY ap.holders_count_delta_3q DESC,
+                ap.total_smart_money_value_delta DESC,
+                ap.current_holders_count DESC
+       LIMIT ?`
+    )
+    .all(...params, limit) as DiscoveryStock[];
+
+  return rows;
+}
+
+// ---------- Stock-page accumulation panel ----------
+
+export type StockAccumulation = {
+  current_holders_count: number;
+  holders_count_1q_ago: number;
+  holders_count_2q_ago: number;
+  holders_count_3q_ago: number;
+  holders_count_delta_3q: number;
+  new_entrants_last_quarter: string[];
+  exited_last_quarter: string[];
+  top_holder_by_dollars: string | null;
+  top_holder_by_dollars_value: number | null;
+  top_holder_by_conviction: string | null;
+  top_holder_by_conviction_pct: number | null;
+  total_smart_money_value: number;
+  total_smart_money_value_delta: number;
+  avg_holding_quarters_across: number | null;
+  phase: Phase;
+  first_smart_buyer: string | null;
+  first_smart_buy_quarter: string | null;
+};
+
+export function getStockAccumulation(ticker: string): StockAccumulation | null {
+  const t = ticker.toUpperCase();
+  const row = db()
+    .prepare(
+      `SELECT ap.*
+       FROM StockAccumulationProfile ap
+       JOIN Stocks s ON s.id = ap.stock_id
+       WHERE UPPER(s.ticker) = ?
+       LIMIT 1`
+    )
+    .get(t) as any;
+  if (!row) return null;
+  return {
+    ...row,
+    new_entrants_last_quarter: safeJsonArray(row.new_entrants_last_quarter),
+    exited_last_quarter: safeJsonArray(row.exited_last_quarter),
+  };
+}
+
+function safeJsonArray(s: string | null | undefined): string[] {
+  if (!s) return [];
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+// ---------- Per-fund position detail (the "Who is building" table) ----------
+
+export type StockHolderDetail = {
+  cik: string;
+  fund_name: string;
+  manager_name: string | null;
+  fund_type: string | null;
+  cap_focus: string | null;
+  style_tags: string | null;
+  shares: number;
+  value: number;
+  pct_portfolio: number;
+  first_buy_quarter: string | null;
+  holding_quarters: number | null;
+  pattern: Pattern | null;
+  phase: PositionPhase | null;
+  conviction_score: number | null;
+  consecutive_adds: number | null;
+  last_activity_quarter: string | null;
+  last_activity_type: string | null;
+  est_avg_cost: number | null;
+  unrealized_pnl_pct: number | null;
+};
+
+export function getStockHolderDetails(ticker: string): StockHolderDetail[] {
+  const t = ticker.toUpperCase();
+  return db()
+    .prepare(
+      `WITH latest AS (
+         SELECT fi.id, fi.fund_id, fi.quarter
+         FROM Filings fi
+         WHERE fi.period_of_report = (
+           SELECT MAX(period_of_report) FROM Filings WHERE fund_id = fi.fund_id
+         )
+       )
+       SELECT f.cik, f.name AS fund_name, f.manager_name,
+              f.fund_type, f.cap_focus, f.style_tags,
+              h.shares, h.value, h.pct_portfolio,
+              pl.first_buy_quarter, pl.holding_quarters,
+              pl.pattern, pl.phase, pl.conviction_score, pl.consecutive_adds,
+              pl.last_activity_quarter, pl.last_activity_type,
+              pl.est_avg_cost, pl.unrealized_pnl_pct
+       FROM Holdings h
+       JOIN latest     ON latest.id = h.filing_id
+       JOIN Funds  f   ON f.id      = latest.fund_id
+       JOIN Stocks s   ON s.id      = h.stock_id
+       LEFT JOIN PositionLifecycle pl
+              ON pl.fund_id = f.id AND pl.stock_id = h.stock_id
+       WHERE UPPER(s.ticker) = ?
+       ORDER BY pl.conviction_score DESC NULLS LAST, h.value DESC`
+    )
+    .all(t) as StockHolderDetail[];
+}
+
+// ---------- Activity feed for a stock ----------
+
+export type ActivityEvent = {
+  quarter: string;
+  manager_name: string | null;
+  fund_name: string;
+  cik: string;
+  event_type: string;
+  magnitude_pct: number | null;
+  pct_portfolio: number | null;
+  narrative: string;
+  importance: number;
+};
+
+export function getStockActivityFeed(ticker: string, limit = 40): ActivityEvent[] {
+  const t = ticker.toUpperCase();
+  return db()
+    .prepare(
+      `SELECT ev.quarter, f.manager_name, f.name AS fund_name, f.cik,
+              ev.event_type, ev.magnitude_pct, ev.pct_portfolio,
+              ev.narrative, ev.importance
+       FROM StockActivityEvent ev
+       JOIN Funds  f ON f.id  = ev.fund_id
+       JOIN Stocks s ON s.id  = ev.stock_id
+       WHERE UPPER(s.ticker) = ?
+       ORDER BY ev.quarter DESC, ev.importance DESC
+       LIMIT ?`
+    )
+    .all(t, limit) as ActivityEvent[];
+}
+
+// ---------- Sectors list (for discovery dropdown) ----------
+
+export function listSectors(): string[] {
+  const rows = db()
+    .prepare(
+      `SELECT DISTINCT sector FROM Stocks
+       WHERE sector IS NOT NULL AND sector != ''
+       ORDER BY sector`
+    )
+    .all() as { sector: string }[];
+  return rows.map((r) => r.sector);
+}
+
+// ---------- Phase summary (for discovery header) ----------
+
+export type PhaseCount = { phase: Phase; count: number };
+
+export function getPhaseCounts(): PhaseCount[] {
+  return db()
+    .prepare(
+      `SELECT phase, COUNT(*) AS count
+       FROM StockAccumulationProfile
+       GROUP BY phase
+       ORDER BY count DESC`
+    )
+    .all() as PhaseCount[];
+}
